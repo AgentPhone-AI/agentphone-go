@@ -11,7 +11,6 @@ type MessagesService struct {
 	client *Client
 }
 
-
 // Message represents a single SMS/iMessage message.
 type Message struct {
 	ID             string `json:"id"`
@@ -20,30 +19,36 @@ type Message struct {
 	ToNumber       string `json:"toNumber,omitempty"`
 	Body           string `json:"body"`
 	Direction      string `json:"direction,omitempty"` // "inbound" | "outbound"
-	Status string `json:"status,omitempty"`
-	FailureReason string `json:"failureReason,omitempty"`
-	ReceivedAt string `json:"receivedAt,omitempty"`
+	Status         string `json:"status,omitempty"`
+	FailureReason  string `json:"failureReason,omitempty"`
+	ReceivedAt     string `json:"receivedAt,omitempty"`
 }
 
-
-// ListMessagesResponse is the response shape used by endpoints that return a page of messages (e.g. NumbersService.GetMessages). 
+// ListMessagesResponse is the response shape used by endpoints that return a page of messages (e.g. NumbersService.GetMessages).
 type ListMessagesResponse struct {
 	Messages []Message `json:"data"`
 	CursorPageInfo
 }
 
-
 // SendMessageParams are the parameters for sending a message. Exactly how
 // the sender is identified (AgentID vs. NumberID)
 type SendMessageParams struct {
-	AgentID  string `json:"agentId,omitempty"`
-	NumberID string `json:"numberId,omitempty"`
-	ToNumber string `json:"toNumber"`
-	Body     string `json:"body"`
-	// MediaURL attaches an image for MMS/iMessage. Optional.
-	MediaURL string `json:"mediaUrl,omitempty"`
+	AgentID    		 string   				`json:"agent_id,omitempty"`
+	ToNumber   		 string   				`json:"to_number,omitempty"`
+	Recipients     []string   				`json:"recipients,omitempty"`
+	Body             string   				`json:"body"`
+	MediaURL         string                 `json:"media_url,omitempty"`
+	MediaURLs        []string               `json:"media_urls,omitempty"`
+	NumberID         string                 `json:"number_id,omitempty"`
+	FromNumber       string                 `json:"from_number,omitempty"`
+	Channel          string                 `json:"channel,omitempty"`
+	SendStyle        string                 `json:"send_style,omitempty"`
+	ReplyToMessageID string                 `json:"reply_to_message_id,omitempty"`
+	Buttons          []string               `json:"buttons,omitempty"`
+	List             map[string]interface{} `json:"list,omitempty"`
+	CTA              map[string]interface{} `json:"cta,omitempty"`
+	Template         map[string]interface{} `json:"template,omitempty"`
 }
-
 
 // Send sends a new message.
 func (s *MessagesService) Send(ctx context.Context, params *SendMessageParams) (*Message, error) {
@@ -60,13 +65,11 @@ type Reaction struct {
 	CreatedAt string `json:"createdAt,omitempty"`
 }
 
-
 // SendReactionParams are the parameters for reacting to a message.
 // Reaction is one of: "love", "like", "dislike", "laugh", "emphasize", "question". Not a literal emoji character, despite the endpoint's name
 type SendReactionParams struct {
 	Reaction string `json:"reaction"`
 }
-
 
 // SendReaction sends a tapback reaction to an existing message.
 func (s *MessagesService) SendReaction(ctx context.Context, messageID string, params *SendReactionParams) (*Reaction, error) {

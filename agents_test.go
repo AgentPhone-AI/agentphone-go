@@ -2,6 +2,7 @@ package agentphone
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -179,5 +180,64 @@ func TestAgentsService_ListCallsAndConversations_Paths(t *testing.T) {
 	}
 	if len(paths) != 2 || paths[0] != "/agents/agt_1/calls" || paths[1] != "/agents/agt_1/conversations" {
 		t.Errorf("paths = %v", paths)
+	}
+}
+
+func TestAgentsService_WebhookEndpoints(t *testing.T) {
+	var requests []string
+	client, server := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		requests = append(requests, r.Method+" "+r.URL.Path+"?"+r.URL.RawQuery)
+		w.WriteHeader(http.StatusOK)
+		switch r.URL.Path {
+		case "/agents/agt_1/webhook":
+			if r.Method == http.MethodPost {
+				var body CreateOrUpdateWebhookParams
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatalf("decode agent webhook body: %v", err)
+				}
+				if body.URL != "https://example.com/agent-hook" {
+					t.Errorf("webhook URL = %q", body.URL)
+				}
+			}
+			w.Write([]byte(`{"id":"wh_1","url":"https://example.com/agent-hook"}`))
+		case "/agents/agt_1/webhook/deliveries":
+			w.Write([]byte(`[{"id":"del_1","eventType":"message.received","status":"success","attemptCount":1}]`))
+		}
+	})
+	defer server.Close()
+
+	if _, err := client.Agents.GetWebhook(context.Background(), "agt_1"); err != nil {
+		t.Fatalf("GetWebhook() error: %v", err)
+	}
+	if _, err := client.Agents.CreateOrUpdateWebhook(context.Background(), "agt_1", &CreateOrUpdateWebhookParams{URL: "https://example.com/agent-hook"}); err != nil {
+		t.Fatalf("CreateOrUpdateWebhook() error: %v", err)
+	}
+	if err := client.Agents.TestWebhook(context.Background(), "agt_1"); err != nil {
+		t.Fatalf("TestWebhook() error: %v", err)
+	}
+	deliveries, err := client.Agents.ListWebhookDeliveries(context.Background(), "agt_1", 5)
+	if err != nil {
+		t.Fatalf("ListWebhookDeliveries() error: %v", err)
+	}
+	if len(deliveries) != 1 || deliveries[0].EventType != "message.received" || deliveries[0].AttemptCount != 1 {
+		t.Errorf("deliveries = %+v", deliveries)
+	}
+	if err := client.Agents.DeleteWebhook(context.Background(), "agt_1"); err != nil {
+		t.Fatalf("DeleteWebhook() error: %v", err)
+	}
+	want := []string{
+		"GET /agents/agt_1/webhook?",
+		"POST /agents/agt_1/webhook?",
+		"POST /agents/agt_1/webhook/test?",
+		"GET /agents/agt_1/webhook/deliveries?limit=5",
+		"DELETE /agents/agt_1/webhook?",
+	}
+	if len(requests) != len(want) {
+		t.Fatalf("requests = %v, want %v", requests, want)
+	}
+	for index := range want {
+		if requests[index] != want[index] {
+			t.Errorf("requests[%d] = %q, want %q", index, requests[index], want[index])
+		}
 	}
 }

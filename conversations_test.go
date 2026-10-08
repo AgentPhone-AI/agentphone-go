@@ -54,18 +54,22 @@ func TestConversationsService_UpdateAndGetMessages(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Fatalf("decode update body: %v", err)
 			}
-			if body.Metadata["orderId"] != "ORD-2" {
-				t.Errorf("metadata = %v", body.Metadata)
+			if body.Metadata["orderId"] != "ORD-2" || body.GroupName != "Weekend Trip" {
+				t.Errorf("update body = %+v", body)
 			}
-			w.Write([]byte(`{"id":"conv_1","metadata":{"orderId":"ORD-2"}}`))
+			w.Write([]byte(`{"id":"conv_1","metadata":{"orderId":"ORD-2"},"groupName":"Weekend Trip"}`))
 			return
 		}
 		w.Write([]byte(`{"data":[{"id":"msg_1","body":"Hello"}],"hasMore":true}`))
 	})
 	defer server.Close()
 
-	if _, err := client.Conversations.Update(context.Background(), "conv_1", &UpdateConversationParams{Metadata: map[string]interface{}{"orderId": "ORD-2"}}); err != nil {
+	updated, err := client.Conversations.Update(context.Background(), "conv_1", &UpdateConversationParams{Metadata: map[string]interface{}{"orderId": "ORD-2"}, GroupName: "Weekend Trip"})
+	if err != nil {
 		t.Fatalf("Update() error: %v", err)
+	}
+	if updated.GroupName != "Weekend Trip" {
+		t.Errorf("group name = %q, want Weekend Trip", updated.GroupName)
 	}
 	messages, err := client.Conversations.GetMessages(context.Background(), "conv_1", &CursorListParams{Limit: 2, Before: "cursor /1"})
 	if err != nil {

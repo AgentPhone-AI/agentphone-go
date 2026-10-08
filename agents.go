@@ -3,14 +3,14 @@ package agentphone
 import (
 	"context"
 	"net/http"
+	"net/url"
+	"strconv"
 )
-
 
 // AgentsService handles the /agents endpoints: creating and configuring AI agent personas, and their attached numbers, conversations, and calls.
 type AgentsService struct {
 	client *Client
 }
-
 
 // Agent represents an AI agent persona (voice mode, prompt, voice settings) that can have phone numbers attached to it.
 type Agent struct {
@@ -116,7 +116,6 @@ func (s *AgentsService) Update(ctx context.Context, agentID string, params *Upda
 	return &agent, err
 }
 
-
 // Delete deletes an agent. Its numbers, conversations, and calls have their agent reference cleared but are not themselves deleted.
 func (s *AgentsService) Delete(ctx context.Context, agentID string) error {
 	return s.client.request(ctx, http.MethodDelete, "/agents/"+agentID, nil, nil)
@@ -173,4 +172,58 @@ func (s *AgentsService) ListVoices(ctx context.Context) (*ListVoicesResponse, er
 	var resp ListVoicesResponse
 	err := s.client.request(ctx, http.MethodGet, "/agents/voices", nil, &resp)
 	return &resp, err
+}
+
+// AgentWebhookDelivery is one delivery attempt for an agent-specific webhook.
+type AgentWebhookDelivery struct {
+	ID            string `json:"id"`
+	MessageID     string `json:"messageId,omitempty"`
+	EventType     string `json:"eventType,omitempty"`
+	Channel       string `json:"channel,omitempty"`
+	Status        string `json:"status"`
+	HTTPStatus    *int   `json:"httpStatus,omitempty"`
+	ErrorMessage  string `json:"errorMessage,omitempty"`
+	ResponseBody  string `json:"responseBody,omitempty"`
+	AttemptCount  int    `json:"attemptCount"`
+	LastAttemptAt string `json:"lastAttemptAt,omitempty"`
+	NextRetryAt   string `json:"nextRetryAt,omitempty"`
+	CreatedAt     string `json:"createdAt,omitempty"`
+}
+
+// GetWebhook retrieves an agent's webhook configuration.
+func (s *AgentsService) GetWebhook(ctx context.Context, agentID string) (*Webhook, error) {
+	var webhook Webhook
+	err := s.client.request(ctx, http.MethodGet, "/agents/"+agentID+"/webhook", nil, &webhook)
+	return &webhook, err
+}
+
+// CreateOrUpdateWebhook registers or replaces an agent's webhook configuration.
+func (s *AgentsService) CreateOrUpdateWebhook(ctx context.Context, agentID string, params *CreateOrUpdateWebhookParams) (*Webhook, error) {
+	var webhook Webhook
+	err := s.client.request(ctx, http.MethodPost, "/agents/"+agentID+"/webhook", params, &webhook)
+	return &webhook, err
+}
+
+// DeleteWebhook removes an agent's webhook configuration.
+func (s *AgentsService) DeleteWebhook(ctx context.Context, agentID string) error {
+	return s.client.request(ctx, http.MethodDelete, "/agents/"+agentID+"/webhook", nil, nil)
+}
+
+// TestWebhook sends a test event to an agent's webhook URL.
+func (s *AgentsService) TestWebhook(ctx context.Context, agentID string) error {
+	return s.client.request(ctx, http.MethodPost, "/agents/"+agentID+"/webhook/test", nil, nil)
+}
+
+// ListWebhookDeliveries returns recent delivery attempts for an agent's webhook.
+func (s *AgentsService) ListWebhookDeliveries(ctx context.Context, agentID string, limit int) ([]AgentWebhookDelivery, error) {
+	path := "/agents/" + agentID + "/webhook/deliveries"
+	if limit != 0 {
+		query := url.Values{}
+		query.Set("limit", strconv.Itoa(limit))
+		path += "?" + query.Encode()
+	}
+
+	var deliveries []AgentWebhookDelivery
+	err := s.client.request(ctx, http.MethodGet, path, nil, &deliveries)
+	return deliveries, err
 }

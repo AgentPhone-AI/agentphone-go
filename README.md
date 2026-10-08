@@ -72,6 +72,7 @@ Get your API key from [agentphone.to](https://agentphone.to) under **Settings â†
 | `Webhooks`      | Configure inbound event webhooks and view delivery logs       |
 | `Verification`  | Send and check verification codes                             |
 | `Usage`         | Query usage stats by account, number, or agent                |
+| `Feedback`      | Submit API issues, documentation mismatches, and suggestions  |
 | `Sub-Accounts`  | Manage sub-accounts                                           |
 | `SIP Trunks`    | Configure SIP trunk connections                               |
 | `WhatsApp`      | Connect and manage WhatsApp numbers and templates             |

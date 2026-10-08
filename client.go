@@ -37,6 +37,7 @@ type Client struct {
 	WhatsApp      *WhatsAppService
 	Registration  *RegistrationService
 	Location      *LocationService
+	Feedback      *FeedbackService
 }
 
 // clientOptions collects everything the Option functions configure, before
@@ -129,6 +130,7 @@ func NewClient(apiKey string, opts ...Option) *Client {
 	c.WhatsApp = &WhatsAppService{client: c}
 	c.Registration = &RegistrationService{client: c}
 	c.Location = &LocationService{client: c}
+	c.Feedback = &FeedbackService{client: c}
 
 	return c
 }

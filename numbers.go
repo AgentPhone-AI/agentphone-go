@@ -6,7 +6,6 @@ import (
 	"net/url"
 )
 
-
 // NumbersService handles the /numbers endpoints: buying, listing, and
 // managing phone numbers.
 type NumbersService struct {
@@ -19,9 +18,9 @@ type Number struct {
 	PhoneNumber string `json:"phoneNumber"`
 	Type        string `json:"type,omitempty"` // e.g. "local", "toll_free"
 	AgentID     string `json:"agentId,omitempty"`
+	ExternalID  string `json:"externalId,omitempty"`
 	CreatedAt   string `json:"createdAt,omitempty"`
 }
-
 
 // ListNumbersResponse is the response from ListNumbers. Numbers uses offset-based pagination
 type ListNumbersResponse struct {
@@ -29,14 +28,12 @@ type ListNumbersResponse struct {
 	OffsetPageInfo
 }
 
-
 // List returns the numbers on the account. params may be nil.
 func (s *NumbersService) List(ctx context.Context, params *ListParams) (*ListNumbersResponse, error) {
 	var resp ListNumbersResponse
 	err := s.client.request(ctx, http.MethodGet, "/numbers"+params.toQuery(), nil, &resp)
 	return &resp, err
 }
-
 
 // CreateNumberParams are the parameters for buying/creating a number.
 type CreateNumberParams struct {
@@ -57,14 +54,12 @@ func (s *NumbersService) Create(ctx context.Context, params *CreateNumberParams)
 	return &num, err
 }
 
-
 // AvailableNumber is a number that can be purchased.
 type AvailableNumber struct {
 	PhoneNumber string `json:"phoneNumber"`
 	Type        string `json:"type,omitempty"`
 	Price       string `json:"price,omitempty"`
 }
-
 
 // ListAvailableNumbersResponse is the response from ListAvailable.
 type ListAvailableNumbersResponse struct {
@@ -99,7 +94,6 @@ func (p *ListAvailableNumbersParams) toQuery() string {
 	return ""
 }
 
-
 // ListAvailable searches for numbers available for purchase. params may be nil.
 func (s *NumbersService) ListAvailable(ctx context.Context, params *ListAvailableNumbersParams) (*ListAvailableNumbersResponse, error) {
 	var resp ListAvailableNumbersResponse
@@ -115,7 +109,6 @@ type LookupResult struct {
 	LineType    string `json:"lineType,omitempty"`
 }
 
-
 // Lookup checks carrier and line-type info for a phone number.
 func (s *NumbersService) Lookup(ctx context.Context, phoneNumber string) (*LookupResult, error) {
 	q := url.Values{}
@@ -126,11 +119,25 @@ func (s *NumbersService) Lookup(ctx context.Context, phoneNumber string) (*Looku
 	return &result, err
 }
 
-
 // Get retrieves a single number by ID.
 func (s *NumbersService) Get(ctx context.Context, numberID string) (*Number, error) {
 	var num Number
 	err := s.client.request(ctx, http.MethodGet, "/numbers/"+numberID, nil, &num)
+	return &num, err
+}
+
+// UpdateNumberParams contains the fields accepted by PATCH /numbers/{id}.
+// Set ExternalID to a string to assign it. Use json.RawMessage("null") to clear it;
+// leave it nil to keep the current value.
+type UpdateNumberParams struct {
+	ExternalID interface{} `json:"externalId,omitempty"`
+}
+
+// Update changes a number's external identifier. The API currently accepts no
+// other fields on this endpoint.
+func (s *NumbersService) Update(ctx context.Context, numberID string, params *UpdateNumberParams) (*Number, error) {
+	var num Number
+	err := s.client.request(ctx, http.MethodPatch, "/numbers/"+numberID, params, &num)
 	return &num, err
 }
 
@@ -139,8 +146,7 @@ func (s *NumbersService) Delete(ctx context.Context, numberID string) error {
 	return s.client.request(ctx, http.MethodDelete, "/numbers/"+numberID, nil, nil)
 }
 
-
-// GetMessages returns the messages sent/received on a specific number, newest first. Message endpoints use cursor-based pagination 
+// GetMessages returns the messages sent/received on a specific number, newest first. Message endpoints use cursor-based pagination
 func (s *NumbersService) GetMessages(ctx context.Context, numberID string, params *CursorListParams) (*ListMessagesResponse, error) {
 	var resp ListMessagesResponse
 	err := s.client.request(ctx, http.MethodGet, "/numbers/"+numberID+"/messages"+params.toQuery(), nil, &resp)

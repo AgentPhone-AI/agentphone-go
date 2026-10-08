@@ -13,10 +13,10 @@ func TestRegistrationService_GetStatusAndDetails(t *testing.T) {
 		requests = append(requests, r.Method+" "+r.URL.Path)
 		w.WriteHeader(http.StatusOK)
 		if r.URL.Path == "/register/status" {
-			w.Write([]byte(`{"status":"approved"}`))
+			w.Write([]byte(`{"campaign_status":"approved","message":"Registration approved"}`))
 			return
 		}
-		w.Write([]byte(`{"status":"approved","brand":{"legalName":"Example Inc","ein":"12-3456789"},"campaign":{"useCase":"customer-care","sampleMessages":["Hello"]}}`))
+		w.Write([]byte(`{"campaign_status":"approved","brand":{"business_name":"Example Inc","ein":"12-3456789"},"campaign":{"use_case":"customer_care","message_samples":["Hello"]}}`))
 	})
 	defer server.Close()
 
@@ -28,7 +28,7 @@ func TestRegistrationService_GetStatusAndDetails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetDetails() error: %v", err)
 	}
-	if status.Status != "approved" || reg.Brand == nil || reg.Brand.LegalName != "Example Inc" || reg.Campaign == nil || reg.Campaign.SampleMessages[0] != "Hello" {
+	if status.Status != "approved" || reg.Status != "approved" || reg.Brand == nil || reg.Brand.BusinessName != "Example Inc" || reg.Campaign == nil || reg.Campaign.MessageSamples[0] != "Hello" {
 		t.Errorf("status = %+v, registration = %+v", status, reg)
 	}
 	want := []string{"GET /register/status", "GET /register"}
@@ -50,18 +50,42 @@ func TestRegistrationService_RegisterAndUpdate(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatalf("decode request body: %v", err)
 		}
-		if body["legalName"] != "Example Inc" || body["useCase"] != "customer-care" {
+		if body["business_name"] != "Example Inc" || body["use_cases"] == nil {
 			t.Errorf("request body = %v", body)
+		}
+		if r.Method == http.MethodPost && (body["message_samples"] == nil || body["phone_number"] != "+15551234567") {
+			t.Errorf("registration POST body = %v", body)
+		}
+		if _, ok := body["legalName"]; ok {
+			t.Errorf("request body = %v, unexpectedly contains legacy legalName", body)
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"pending"}`))
 	})
 	defer server.Close()
 
-	if _, err := client.Registration.Register(context.Background(), &RegisterA2PParams{LegalName: "Example Inc", UseCase: "customer-care"}); err != nil {
+	if _, err := client.Registration.Register(context.Background(), &RegisterA2PParams{
+		RegistrationType: "sole_proprietor",
+		FirstName:        "Ada",
+		LastName:         "Lovelace",
+		Email:            "ada@example.com",
+		PhoneNumber:      "+15551234567",
+		StreetAddress:    "1 Main St",
+		City:             "San Francisco",
+		State:            "CA",
+		ZipCode:          "94105",
+		Description:      "We send service updates to customers who opted in.",
+		UseCases:         []string{"customer_care"},
+		MessageSamples:   []string{"Example Inc: your support request is updated."},
+		ConsentFlow:      "Customers opt in on our website before receiving messages.",
+		OptInImageURL:    "https://example.com/opt-in.png",
+		BusinessName:     "Example Inc",
+	}); err != nil {
 		t.Fatalf("Register() error: %v", err)
 	}
-	if _, err := client.Registration.Update(context.Background(), &UpdateA2PRegistrationParams{LegalName: "Example Inc", UseCase: "customer-care"}); err != nil {
+	businessName := "Example Inc"
+	useCaseList := []string{"customer_care"}
+	if _, err := client.Registration.Update(context.Background(), &UpdateA2PRegistrationParams{BusinessName: &businessName, UseCases: &useCaseList}); err != nil {
 		t.Fatalf("Update() error: %v", err)
 	}
 	want := []string{"POST /register", "PATCH /register"}

@@ -15,33 +15,33 @@ func TestVerificationService_SendAndCheck(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatalf("decode request body: %v", err)
 		}
-		if body["phoneNumber"] != "+14155550100" {
-			t.Errorf("phoneNumber = %q", body["phoneNumber"])
+		if r.URL.Path == "/verify/send" && body["phone_number"] != "+14155550100" {
+			t.Errorf("phone_number = %q", body["phone_number"])
 		}
 		w.WriteHeader(http.StatusOK)
 		if r.URL.Path == "/verify/send" {
-			if body["channel"] != "sms" {
-				t.Errorf("channel = %q, want sms", body["channel"])
-			}
-			w.Write([]byte(`{"status":"pending","phoneNumber":"+14155550100"}`))
+			w.Write([]byte(`{"status":"pending","verification_id":"ver_1"}`))
 			return
+		}
+		if body["verification_id"] != "ver_1" {
+			t.Errorf("verification_id = %q, want ver_1", body["verification_id"])
 		}
 		if body["code"] != "123456" {
 			t.Errorf("code = %q, want 123456", body["code"])
 		}
-		w.Write([]byte(`{"status":"approved","valid":true}`))
+		w.Write([]byte(`{"result":"ok","attempts_remaining":2}`))
 	})
 	defer server.Close()
 
-	sent, err := client.Verification.Send(context.Background(), &SendVerificationParams{PhoneNumber: "+14155550100", Channel: "sms"})
+	sent, err := client.Verification.Send(context.Background(), &SendVerificationParams{PhoneNumber: "+14155550100"})
 	if err != nil {
 		t.Fatalf("Send() error: %v", err)
 	}
-	checked, err := client.Verification.Check(context.Background(), &CheckVerificationParams{PhoneNumber: "+14155550100", Code: "123456"})
+	checked, err := client.Verification.Check(context.Background(), &CheckVerificationParams{VerificationID: "ver_1", Code: "123456"})
 	if err != nil {
 		t.Fatalf("Check() error: %v", err)
 	}
-	if sent.Status != "pending" || sent.PhoneNumber != "+14155550100" || checked.Status != "approved" || !checked.Valid {
+	if sent.Status != "pending" || sent.VerificationID != "ver_1" || checked.Result != "ok" || checked.AttemptsRemaining == nil || *checked.AttemptsRemaining != 2 {
 		t.Errorf("send response = %+v, check response = %+v", sent, checked)
 	}
 	want := []string{"POST /verify/send", "POST /verify/check"}

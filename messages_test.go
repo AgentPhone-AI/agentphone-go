@@ -2,12 +2,13 @@ package agentphone
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
 )
 
-func TestMessagesService_Send_SendsCamelCaseBodyIncludingMediaURL(t *testing.T) {
+func TestMessagesService_Send_SendsSnakeCaseBodyIncludingMediaURL(t *testing.T) {
 	var gotMethod, gotPath, gotBody string
 	client, server := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		gotMethod, gotPath, gotBody = r.Method, r.URL.Path, readBody(t, r)
@@ -28,10 +29,20 @@ func TestMessagesService_Send_SendsCamelCaseBodyIncludingMediaURL(t *testing.T) 
 	if gotMethod != http.MethodPost || gotPath != "/messages" {
 		t.Errorf("got %s %s, want POST /messages", gotMethod, gotPath)
 	}
-	for _, want := range []string{`"agentId"`, `"toNumber"`, `"mediaUrl"`, `"body"`} {
+	var body map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(gotBody), &body); err != nil {
+		t.Fatalf("decode request body %s: %v", gotBody, err)
+	}
+	for _, want := range []string{`"agent_id"`, `"to_number"`, `"media_url"`, `"body"`} {
 		if !strings.Contains(gotBody, want) {
 			t.Errorf("request body %s missing key %s", gotBody, want)
 		}
+	}
+	if _, ok := body["to_number"]; !ok {
+		t.Errorf("request body %s missing required wire key to_number", gotBody)
+	}
+	if _, ok := body["toNumber"]; ok {
+		t.Errorf("request body %s contains camelCase key toNumber", gotBody)
 	}
 	if msg.ID != "msg_1" {
 		t.Errorf("ID = %q, want msg_1", msg.ID)
@@ -54,7 +65,7 @@ func TestMessagesService_Send_OmitsUnsetOptionalFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Send() error: %v", err)
 	}
-	for _, unwanted := range []string{`"mediaUrl"`, `"agentId"`, `"numberId"`} {
+	for _, unwanted := range []string{`"media_url"`, `"agent_id"`, `"number_id"`} {
 		if strings.Contains(gotBody, unwanted) {
 			t.Errorf("request body %s should omit unset %s", gotBody, unwanted)
 		}
